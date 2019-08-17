@@ -13,6 +13,7 @@ import (
 type App struct {
 	Router     *mux.Router
 	Middleware *Middleware
+	Config     *Env
 }
 
 type shortenReq struct {
@@ -24,16 +25,16 @@ type shortLinkResp struct {
 	ShortLink string `json:"short_link"`
 }
 
-func (a *App) Initialize() {
+func (a *App) Initialize(env *Env) {
 	//log flag 的含义
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	a.Config = env
 	a.Router = mux.NewRouter()
 	a.Middleware = &Middleware{}
 	a.initializeRoutes()
 }
 
 func (a *App) Run(addr string) {
-	a.Initialize()
 	log.Fatal(http.ListenAndServe(addr, a.Router))
 }
 
@@ -51,28 +52,43 @@ func (a *App) initializeRoutes() {
 func (a *App) createShortLink(w http.ResponseWriter, r *http.Request) {
 	var req shortenReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responseWithError(w, ReqError{http.StatusBadRequest, fmt.Errorf("%s", "happen err when parsing json from body")}, nil)
+		responseWithError(w, NewBadReqErr(fmt.Errorf("%s", "happen err when parsing json from body")), nil)
 		return
 	}
 	if err := validator.Validate(req); err != nil {
-		responseWithError(w, ReqError{http.StatusBadRequest, fmt.Errorf("validate parameters failed : %+v", req)}, nil)
+		responseWithError(w, NewBadReqErr(fmt.Errorf("validate parameters failed : %+v", req)), nil)
 		return
 	}
 	defer r.Body.Close()
-	responseWithJson(w, 200, req)
+	shorten, err := a.Config.S.Shorten(req.Url, req.ExpirationInMinutes)
+	if err != nil {
+		responseWithError(w, err, nil)
+	} else {
+		responseWithJson(w, http.StatusCreated, shortLinkResp{ShortLink: shorten})
+	}
 }
 
 // 短地址解析
 func (a *App) getShortLinkInfo(w http.ResponseWriter, r *http.Request) {
 	values := r.URL.Query()
 	sl := values.Get("shortLink")
-	fmt.Printf("%s\n", sl)
+	info, err := a.Config.S.ShortLinkInfo(sl)
+	if err != nil {
+		responseWithError(w, err, nil)
+	} else {
+		responseWithJson(w, http.StatusOK, info)
+	}
 }
 
 //访问，重定向 302
 func (a *App) redirect(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	fmt.Printf("%s\n", vars["shortLink"])
+	url, err := a.Config.S.UnShorten(vars["shortLink"])
+	if err != nil {
+		responseWithError(w, err, nil)
+	} else {
+		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	}
 }
 
 func responseWithError(w http.ResponseWriter, err error, payload interface{}) {

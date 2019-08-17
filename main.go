@@ -2,6 +2,6 @@ package main
 
 func main() {
 	a := App{}
-	a.Initialize()
+	a.Initialize(getEnv())
 	a.Run(":8080")
 }
