@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/go-redis/redis"
 	"github.com/mattheath/base62"
+	"github.com/speps/go-hashids"
 	"time"
 )
 
@@ -73,7 +74,12 @@ func (r *RedisCli) Shorten(url string, exp int64) (string, error) {
 }
 
 func toSha1(url string) string {
-	return url
+	hd := hashids.NewData()
+	hd.Salt = url
+	hd.MinLength = 0
+	h, _ := hashids.NewWithData(hd)
+	r, _ := h.Encode([]int{45, 434, 1313, 99})
+	return r
 }
 
 func (r *RedisCli) ShortLinkInfo(shortLink string) (interface{}, error) {
