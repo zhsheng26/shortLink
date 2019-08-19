@@ -5,8 +5,6 @@ import "os"
 func main() {
 	setEnv()
 	a := App{}
-	sha1 := toSha1("http://www.baidu.com")
-	println(sha1)
 	a.Initialize(getEnv())
 	a.Run(":8080")
 }

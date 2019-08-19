@@ -22,8 +22,7 @@ type RedisCli struct {
 }
 
 func (r *RedisCli) Shorten(url string, exp int64) (string, error) {
-	urlHash := toSha1(url)
-
+	urlHash := toHash(url)
 	d, err := r.Cli.Get(fmt.Sprintf(UrlHashKey, urlHash)).Result()
 	if err == redis.Nil {
 		//no exist ,generate new
@@ -73,7 +72,7 @@ func (r *RedisCli) Shorten(url string, exp int64) (string, error) {
 	return shortLink, nil
 }
 
-func toSha1(url string) string {
+func toHash(url string) string {
 	hd := hashids.NewData()
 	hd.Salt = url
 	hd.MinLength = 0
